@@ -1,16 +1,13 @@
+import os
+
 import tornado.httpserver
 import tornado.httpclient
 import tornado.ioloop
 import tornado.web
 import tornado.escape
 import tornado.template
+
 from ismi_search import Results, Filter
-
-
-class SearchHandler(tornado.web.RequestHandler):
-    @tornado.web.asynchronous
-    def get(self, *args, **kwargs):
-        self.render('templates/results.html')
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -19,11 +16,16 @@ class MainHandler(tornado.web.RequestHandler):
 
     @tornado.web.asynchronous
     def get(self, *args, **kwargs):
-        keywords = {
-            'options':self.options(),
-            'table_headers':self.table_headers()
-        }
-        self.render('templates/index.html',**keywords)
+        req_filters = self.request.arguments.get('filter', [])
+        filters = []
+        for filt in req_filters:
+            try:
+                f = eval(filt)
+                if isinstance(f, Filter):
+                    filters.append(f)
+            except:
+                continue
+        self.render('templates/index.html')
 
     @tornado.web.asynchronous
     def post(self, *args, **kwargs):
@@ -37,11 +39,11 @@ settings = {
 }
 
 application = tornado.web.Application([
-    (r'/?', MainHandler),
-    (r'/search/?', SearchHandler)
+    (r'/?', MainHandler)
 ], **settings)
 
 def main(port):
+    application.filters = []
     application.listen(port)
     tornado.ioloop.IOLoop.instance().start()
 

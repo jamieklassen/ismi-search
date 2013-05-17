@@ -170,32 +170,22 @@ class Filter(object):
     F_EXACT = 1
     F_APPROX = 2
 
-    def __init__(self):
+    def __init__(self, query_string, query_type, fquery_string, fquery_type):
         super(Filter, self).__init__()
         cls = self.__class__
-        self.query_string = u''
-        self.query_type = cls.Q_APPROX
-        self.fquery_string = None
-        self.__fquery_type = cls.F_ANY
-
-    @property
-    def fquery_type(self):
-        return self.__fquery_type
-
-    @fquery_type.setter
-    def fquery_type(self, value):
-        cls = self.__class__
-        if self.__fquery_type != value:
-            if self.__fquery_type == cls.F_ANY:
-                self.fquery_string = u''
-            self.__fquery_type = value
-            if value == cls.F_ANY:
-                self.fquery_string = None
+        self.query_string = query_string
+        self.query_type = query_type
+        self.fquery_string = fquery_string
+        self.fquery_type = fquery_type
 
     def apply(self, results):
         cls = self.__class__
         if self.fquery_type == cls.F_ANY:
             return Objects.search('all', self.query_string, filter=results.docs())
+
+    def __repr__(self):
+        return 'Filter({0}, {1}, {2}, {3})'.format(repr(self.query_string), repr(self.query_type),
+                                                   repr(self.fquery_string), repr(self.fquery_type))
 
 
 class Results(object):
