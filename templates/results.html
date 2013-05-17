@@ -1,0 +1,25 @@
+<script src="/static/js/jquery.treeview.js" type="text/javascript"></script>
+<link rel="stylesheet" href="/static/css/jquery.treeview.css" type="text/css" />
+<script type="text/javascript">
+    $(document).ready(function () {
+        $("#{{ id }}").treeview({
+            animated: "fast",
+            collapsed: true,
+        });
+    });
+</script>
+<ul id="{{ id }}" class="treeview-red">
+    {% for oc, count, objects in r.objects_w_headings %}
+        <li><span>{{ oc }} ({{ count }})</span>
+            <ul>
+                {% for obj in objects %}
+                <li>
+                    {% for v in obj.values %}
+                        <span style="float: left;">{{ v }}</span>
+                    {% endfor %}
+                </li>
+                {% endfor %}
+            </ul>
+        </li>
+    {% endfor %}
+</ul>
