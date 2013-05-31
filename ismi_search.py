@@ -17,6 +17,16 @@ class Globals:
                     json.dump(JsonInterface.method('get_ents', oc=d['ov']), fp)
                     fp.close()
 
+    @classmethod
+    def parse_filters(cls, request):
+        filters = request.arguments.get('filter', [])
+        for filt in filters:
+            try:
+                f = Filter(*json.loads(filt))
+                yield f
+            except:
+                continue
+
 
 class JsonInterface(object):
     JSON_INTERFACE = 'https://openmind-ismi-dev.mpiwg-berlin.mpg.de/om4-ismi/jsonInterface?'
@@ -123,19 +133,26 @@ class Objects(object):
             resp = JsonInterface.method('get_ents', oc=d['ov'], include_content='true')
             with cls.get_index().searcher() as s:
                 for ent in resp['ents']:
-                    stored_fields = s.document(id=ent['id'])
+                    stored_fields = s.document(id=unicode(ent['id']))
                     if stored_fields:
-                        cls.delete(ent['id'])
+                        cls.delete(unicode(ent['id']))
                     cls.add_ent(ent)
 
     @classmethod
-    def search(cls, pfields, q, **kwargs):
+    def search(cls, filters, **kwargs):
         schema = cls.get_schema()
-        if pfields == 'all':
-            pfields = schema.names()
-        if isinstance(q, basestring):
-            parser = qparser.MultifieldParser(pfields, schema=schema)
-            q = parser.parse(unicode(query_string))
+        def parse(filt):
+            if filt.query_type == Filter.Q_APPROX:
+                mp = qparser.MultifieldParser(filt.get_fields(), schema=schema)
+                return mp.parse(unicode(filt.query_string))
+            elif filt.query_type == Filter.Q_EXACT:
+                s = cls.get_index().searcher()
+                qs = filt.query_string
+                f = lambda d: qs in [d.get(field) for field in filt.get_fields()]
+                ids = [unicode(d['id']) for d in filter(f,s.documents())]
+                return query.Or([query.Term('id', iden) for iden in ids])
+        queries = [parse(filt) for filt in filters]
+        q = query.And(queries)
         kwargs.update(limit=None, groupedby='oc')
         results = cls.get_index().searcher().search(q, **kwargs)
         return Results(results)
@@ -144,7 +161,8 @@ class Objects(object):
 class Fields(object):
     INDEX_DIR = os.path.join(Globals.BASE_DIR, 'fields')
     INDEX = None
-    SCHEMA = fields.Schema(name=fields.ID, tags=fields.KEYWORD(scorable=True))
+    SCHEMA = fields.Schema(name=fields.TEXT(analyzer=analysis.FancyAnalyzer(), stored=True, chars=True),
+                           tags=fields.KEYWORD(scorable=True))
 
     @classmethod
     def get_index(cls):
@@ -156,11 +174,21 @@ class Fields(object):
             else:
                 cls.INDEX = index.create_in(cls.INDEX_DIR, cls.SCHEMA)
                 writer = cls.INDEX.writer()
+                for att in Definitions.all_atts():
+                    writer.add_document(name=unicode(att['ov']))
+                writer.add_document(name=u'ov')
+                writer.add_document(name=u'nov')
+                writer.add_document(name=u'id')
+                writer.commit()
         return cls.INDEX
 
     @classmethod
     def search(cls, query_string):
-        pass
+        qp = qparser.MultifieldParser(cls.SCHEMA.names(), schema=cls.SCHEMA)
+        q = qp.parse(query_string)
+        s = cls.get_index().searcher()
+        results = s.search(q, limit=None)
+        return [r['name'] for r in results]
 
 
 class Filter(object):
@@ -178,33 +206,34 @@ class Filter(object):
         self.fquery_string = fquery_string
         self.fquery_type = fquery_type
 
-    def apply(self, results):
+    def get_fields(self):
         cls = self.__class__
         if self.fquery_type == cls.F_ANY:
-            return Objects.search('all', self.query_string, filter=results.docs())
+            return Objects.get_schema().names()
+        elif self.fquery_type == cls.F_EXACT:
+            return [self.fquery_string]
+        elif self.fquery_type == cls.F_APPROX:
+            return Fields.search(self.fquery_string)
 
     def __repr__(self):
-        return 'Filter({0}, {1}, {2}, {3})'.format(repr(self.query_string), repr(self.query_type),
-                                                   repr(self.fquery_string), repr(self.fquery_type))
+        args = (self.query_string, self.query_type,
+                self.fquery_string, self.fquery_type)
+        args = map(repr, args)
+        return 'Filter({0})'.format(", ".join(args))
 
 
 class Results(object):
     def __init__(self, results=None):
         self._results = results
         if results is None:
-            self._results = Objects.search('all', query.Every())._results
+            self._results = Objects.get_index().searcher().search(query.Every())
 
-    def apply_filter(self, filt):
-        return filt.apply(self._results)
-
-    def objects(self, oc):
+    def get_dict(self):
         s = Objects.get_index().searcher()
-        for n in self._results.groups()[oc]:
-            yield s.stored_fields(n)
-
-    def objects_w_headings(self):
-        for k, l in self._results.groups().items():
-            yield (k, len(l), self.objects(k))
+        items = self._results.groups().iteritems()
+        d = {k: map(s.stored_fields, v) for k,v in items}
+        d.update(num_results=len(self._results))
+        return d
 
     def __repr__(self):
         s = ', '.join('{0}: {1}'.format(k, len(v)) for k,v in self._results.groups().items())
