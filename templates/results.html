@@ -1,85 +1,44 @@
-<script>
-    $(function() {
-        $("table").tablesorter({ sortList: [[1,0]] });
-    });
+<script type="text/javascript">
+$(document).ready( function () {
+    $('.accordion table').dataTable( {
+            "sDom": 'C<"clear">lfrtip'
+    } );
+});
 </script>
+<h4>{{ num_results }} Results</h4>
 <div class="accordion" id="accordion">
+    {% for i, group in groups %}
     <div class="accordion-group">
         <div class="accordion-heading">
-            <a class="accordion-toggle" data-parent="#accordion" data-toggle="collapse" href="#collapseOne">
-                Collapsible Group Item #1
+            <a class="accordion-toggle"
+               data-parent="#accordion"
+               data-toggle="collapse"
+               href="#collapse{{ i }}">
+                {{ group.name }} ({{ group.num_results }} Results)
             </a>
-            <div class="dropdown show-fields">
-                <a class="btn dropdown-toggle" data-toggle="dropdown" href="#">
-                    Show fields
-                    <span class="caret"></span>
-                </a>
-                <ul class="dropdown-menu">
-                    <li>
-                        <a>Name</a>
-                    </li>
-                    <li>
-                        <a>ID</a>
-                    </li>
-                </ul>
-            </div>
         </div>
-        <div id="collapseOne" class="accordion-body collapse">
+        <div id="collapse{{ i }}" class="accordion-body collapse">
             <div class="accordion-inner">
-                <table class="table table-striped table-condensed">
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                    </tr>
-                    <tr>
-                        <td>1</td>
-                        <td>Bob</td>
-                    </tr>
-                    <tr>
-                        <td>2</td>
-                        <td>Alice</td>
-                    </tr>
+                <table class="table table-condensed">
+                    <thead>
+                        <tr>
+                            {% for header in group.headers %}
+                            <th>{{ header }}</th>
+                            {% end %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in group.items %}
+                        <tr>
+                            {% for field in item.fields %}
+                            <td>{{ field }}</td>
+                            {% end %}
+                        </tr>
+                        {% end %}
+                    </tbody>
                 </table>
             </div>
         </div>
     </div>
-    <div class="accordion-group">
-        <div class="accordion-heading">
-            <a class="accordion-toggle" data-parent="#accordion" data-toggle="collapse" href="#collapseTwo">
-                Collapsible Group Item #2
-            </a>
-            <div class="dropdown show-fields">
-                <a class="btn dropdown-toggle" data-toggle="dropdown" href="#">
-                    Show fields
-                    <span class="caret"></span>
-                </a>
-                <ul class="dropdown-menu">
-                    <li>
-                        <a>Name</a>
-                    </li>
-                    <li>
-                        <a>ID</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-        <div id="collapseTwo" class="accordion-body collapse">
-            <div class="accordion-inner">
-                <table class="table table-striped table-condensed">
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                    </tr>
-                    <tr>
-                        <td>1</td>
-                        <td>Bob</td>
-                    </tr>
-                    <tr>
-                        <td>2</td>
-                        <td>Alice</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-    </div>
+    {% end %}
 </div>
